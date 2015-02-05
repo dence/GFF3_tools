@@ -1,0 +1,70 @@
+#!/usr/bin/perl
+#Daniel Ence
+
+
+my $usage="
+This script takes a set of gene annotations (in gff3 format)
+and a gene ontology (in obo format) and ouptuts a gene
+assocation file (GAF 2.0 file). This GAF file is the input
+to many GO utilities like map2slim. 
+";
+
+my ($gff3_file, $obo_file) = @ARGV;
+
+
+#First, get the namespaces associated to the GO terms
+my %GO_hash;
+my $curr_term="";
+open(OBO, $obo_file);
+while(<OBO>){
+	if(/id\:\s+(GO\:\d+)\s/){
+		$curr_term=$1;
+	}
+	elsif(/^namespace\:\s+(\S+)/){
+		$GO_hash{$curr_term}=$1;
+	} 			
+}
+close OBO;
+
+
+#print the header for the gaf file
+open(GAF, ">tmp.gaf");
+print GAF "!gaf-version: 2.0\n";
+
+#Next get the Gene IDs from the GFF3 file
+open(GFF3, $gff3_file);
+while(<GFF3>){
+	chomp;
+	if(/\tmRNA\t/){
+		#/ID\=([^\;]+).*Ontology_term\=([^\;]+)/;
+		$_ =~ /ID\=([^\;]+)/;
+		my $gene_ID=$1;
+		
+		my $tmp="";
+		if($_ =~ /Ontology_term\=([^\;]+)/){	
+			$tmp=$1;	
+		}
+
+		my @ont_terms = split(/\,/,$tmp);
+		foreach my $term (@ont_terms){
+			my $namespace=$GO_hash{$term};
+			my $abbr="";
+			if($namespace == "biologial_process"){
+				$abbr="P";
+			}
+			elsif($namespace == "cellular_component"){
+				$abbr="C";
+			}
+			elsif($namespace == "molecular_function"){
+				$abbr="F";
+			}
+			print GAF "NULL\t$gene_ID\tNULL\tNULL\t$term\tNULL\tNULL\tNULL\t$abbr\tNULL\tNULL\tNULL\ttaxon:1\tNULL\tNULL\tNULL\tNULL\n";
+		}		
+	}	
+}
+close GFF3;
+
+close GAF;
+
+
+
